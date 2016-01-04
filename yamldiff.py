@@ -20,6 +20,9 @@ import blessings
 Diff = namedtuple("Diff", ('first_only', 'second_only', 'different_vals'))
 
 class HashAny:
+    """Simple utility to class to make any object hashable, using the
+    pickle representation of the object. It does not check for the inmutability
+    of the object, and usig mutated HasAny objects as keys is a bad idea."""
     def __init__(self, val):
         self.val = val
 
@@ -29,11 +32,17 @@ class HashAny:
     def __eq__(self, other):
         return self.val == other.val
 
-    def __str__(self):
-        return ''
+#This might need to be a fancier transparent proxy object.
+class Label(HashAny):
+    def __init__(self, val, index_key):
+        self.val = val
+        self.index_key = index_key
 
-    def __repr__(self):
-        return ''
+    def __str__(self):
+        return str(self.val)
+
+    def spec_str(self):
+        return dict_repr({self.index_key: self.val})
 
 def val_diff(v1,v2):
     if isinstance(v1, dict) and isinstance(v2, dict):
@@ -101,7 +110,8 @@ def reprocess_dict(d, set_keys):
                         reprocessed = reprocess_dict(item, set_keys)
                         result[HashAny(reprocessed)] = reprocessed
                 else:
-                    result = {item[index]: reprocess_dict(item, set_keys)
+                    result = {Label(item[index], index):
+                              reprocess_dict(item, set_keys)
                               for item in v}
             else :
                 result = [reprocess_dict(item, set_keys) for item in v]
@@ -122,14 +132,12 @@ def dict_repr(dic):
 
 def keyvalue_string(key, value):
     #Cast ruamel.yaml types for priting.
-    print("Value is", value, "of type", type(value))
 
     if isinstance(value, list) or isinstance(value, tuple):
         value = [keyvalue_string(HashAny(None), item) for item in value]
     if isinstance(value, dict):
-        print(type(value), "!!")
         value = dict_repr(value)
-    if isinstance(key, HashAny):
+    if isinstance(key, HashAny) or isinstance(key, Label):
         return str(value)
     else:
         return '{}: {}'.format(key, value)
@@ -143,6 +151,9 @@ def print_diff(diff, *, file=None, indent_level=0):
         if first_only:
             print_indent("# Removed keys:", indent_level=indent_level)
             for k in first_only:
+                if isinstance(k, Label):
+                        print_indent("# {}: {}".format(k.index_key, k),
+                                     indent_level=indent_level)
                 if isinstance(first_only, dict):
                     print_indent("- %s" % keyvalue_string(k, first_only[k]),
                       indent_level=indent_level)
@@ -152,6 +163,9 @@ def print_diff(diff, *, file=None, indent_level=0):
         if second_only:
             print_indent("# Added keys:", indent_level=indent_level)
             for k in second_only:
+                if isinstance(k, Label):
+                        print_indent("# {}: {}".format(k.index_key, k),
+                                      indent_level=indent_level)
                 if isinstance(second_only, dict):
                     print_indent("+ %s" % keyvalue_string(k, second_only[k]),
                       indent_level=indent_level)
@@ -162,7 +176,12 @@ def print_diff(diff, *, file=None, indent_level=0):
         if different_keys:
             print_indent("# Modified keys:", indent_level=indent_level)
             for k in different_keys:
-                print_indent(str(k) + ":", indent_level=indent_level)
+                if isinstance(k, Label):
+                        print_indent("# Matching:", indent_level=indent_level)
+                        print_indent(k.spec_str(),
+                                     indent_level=indent_level)
+                else:
+                    print_indent(str(k) + ":", indent_level=indent_level)
                 v = different_keys[k]
                 if isinstance(v, Diff):
                     print_diff(v, indent_level = indent_level+1)
