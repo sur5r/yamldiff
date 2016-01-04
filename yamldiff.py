@@ -22,15 +22,16 @@ Diff = namedtuple("Diff", ('first_only', 'second_only', 'different_vals'))
 class HashAny:
     def __init__(self, val):
         self.val = val
+
     def __hash__(self):
         return hash(pickle.dumps(self.val))
-    
+
     def __eq__(self, other):
         return self.val == other.val
-    
+
     def __str__(self):
         return ''
-    
+
     def __repr__(self):
         return ''
 
@@ -42,14 +43,14 @@ def val_diff(v1,v2):
     return (v1, v2)
 
 def dict_diff(dict1, dict2):
-    
+
     #Keep ordering if we have it
     if isinstance(dict1, OrderedDict):
         first_only_keys = [k for k in dict1.keys() if k not in dict2.keys()]
     else:
         first_only_keys = dict1.keys() - dict2.keys()
     first_only = {k:dict1[k] for k in first_only_keys}
-    
+
     if isinstance(dict2, OrderedDict):
         second_only_keys = [k for k in dict2.keys() if k not in dict1.keys()]
     else:
@@ -60,8 +61,8 @@ def dict_diff(dict1, dict2):
         same_keys = [k for k in dict1.keys() if k in dict2.keys()]
     else:
         same_keys = dict1.keys() & dict2.keys()
-    different_vals = type(dict1)((k, val_diff(dict1[k], dict2[k])) 
-                                 for k in same_keys 
+    different_vals = type(dict1)((k, val_diff(dict1[k], dict2[k]))
+                                 for k in same_keys
                                  if dict1[k] != dict2[k])
     return Diff(first_only, second_only, different_vals)
 
@@ -85,21 +86,31 @@ def print_indent(s, indent_level=0):
 def reprocess_dict(d, set_keys):
     if not isinstance(d, dict):
         return d
-    reproc = type(d)()
+    reproc = PrintableOrderedDict()
     for k, v in d.items():
         if isinstance(v, dict):
             result = reprocess_dict(v, set_keys)
-        elif (isinstance(v, list) or isinstance(v, set)) and k in set_keys:
-            index = set_keys[k]            
-            if index is NoKey:
-                result = {HashAny(item): reprocess_dict(item, set_keys) for item in v}
-            else:
-                result = {item[index]: reprocess_dict(item, set_keys) for item in v}     
+        elif (isinstance(v, list) or isinstance(v, set)):
+            if k in set_keys:
+                index = set_keys[k]
+                if index is NoKey:
+                    result = {HashAny(item): reprocess_dict(item, set_keys)
+                              for item in v}
+                else:
+                    result = {item[index]: reprocess_dict(item, set_keys)
+                              for item in v}
+            else :
+                result = [reprocess_dict(item, set_keys) for item in v]
         else:
             result = v
-        
+
         reproc[k] = result
     return reproc
+
+
+class PrintableOrderedDict(OrderedDict):
+    def __repr__(self):
+        return dict_repr(self)
 
 
 def dict_repr(dic):
@@ -118,7 +129,7 @@ def keyvalue_string(key, value):
         return str(value)
     else:
         return '{}: {}'.format(key, value)
-        
+
 
 def print_diff(diff, *, file=None, indent_level=0):
     first_only, second_only, different_keys = diff
@@ -129,21 +140,21 @@ def print_diff(diff, *, file=None, indent_level=0):
             print_indent("# Removed keys:", indent_level=indent_level)
             for k in first_only:
                 if isinstance(first_only, dict):
-                    print_indent("- %s" % keyvalue_string(k, first_only[k]), 
+                    print_indent("- %s" % keyvalue_string(k, first_only[k]),
                       indent_level=indent_level)
                 else:
-                    print_indent("- {}".format(k), 
+                    print_indent("- {}".format(k),
                       indent_level=indent_level)
         if second_only:
             print_indent("# Added keys:", indent_level=indent_level)
             for k in second_only:
                 if isinstance(second_only, dict):
-                    print_indent("+ %s" % keyvalue_string(k, second_only[k]), 
+                    print_indent("+ %s" % keyvalue_string(k, second_only[k]),
                       indent_level=indent_level)
                 else:
-                    print_indent("+ {}".format(k), 
+                    print_indent("+ {}".format(k),
                       indent_level=indent_level)
-                    
+
         if different_keys:
             print_indent("# Modified keys:", indent_level=indent_level)
             for k in different_keys:
@@ -160,13 +171,12 @@ def yaml_diff(p1, p2,  *, set_keys=None):
         d1 = yaml.load(f1,Loader=yaml.RoundTripLoader)
     with open(p2) as f2:
         d2 = yaml.load(f2, Loader=yaml.RoundTripLoader)
-    
-    if set_keys:
-        try:
-            d1 = reprocess_dict(d1, set_keys)
-            d2 = reprocess_dict(d2, set_keys)
-        except KeyError as e:
-            raise ValueError("Bad set key: {}".format(next(iter(e.args))))
+
+    try:
+        d1 = reprocess_dict(d1, set_keys)
+        d2 = reprocess_dict(d2, set_keys)
+    except KeyError as e:
+        raise ValueError("Bad set key: {}".format(next(iter(e.args))))
     diff = dict_diff(d1, d2)
     print_diff(diff)
 
@@ -184,7 +194,7 @@ def parse_keys(keys):
         else:
             raise ValueError("Wrong spec")
         yield (name, index)
-        
+
 
 def main():
     parser = argparse.ArgumentParser()
