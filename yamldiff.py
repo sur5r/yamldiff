@@ -94,8 +94,12 @@ def reprocess_dict(d, set_keys):
             if k in set_keys:
                 index = set_keys[k]
                 if index is NoKey:
-                    result = {HashAny(item): reprocess_dict(item, set_keys)
-                              for item in v}
+                    #Can't use dict comprehension here because we have to
+                    # hash the reprocessed item
+                    result = {}
+                    for item in v:
+                        reprocessed = reprocess_dict(item, set_keys)
+                        result[HashAny(reprocessed)] = reprocessed
                 else:
                     result = {item[index]: reprocess_dict(item, set_keys)
                               for item in v}
