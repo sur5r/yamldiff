@@ -1,9 +1,8 @@
-# -*- coding: utf-8 -*-
 """
-Created on Thu Feb 25 12:11:38 2016
-
-@author: Zahari Kassabov
+A package to semantically diff yaml files on the console.
 """
 
 from .dictdiff import dict_diff, yaml_diff, parse_keys #analysis:ignore
+
+__version__ = "0.3"
 
