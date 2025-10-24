@@ -14,7 +14,7 @@ import contextlib
 import argparse
 import pickle
 
-import ruamel.yaml as yaml
+import ruamel.yaml
 import blessings
 
 Diff = namedtuple("Diff", ('first_only', 'second_only', 'different_vals'))
@@ -190,10 +190,11 @@ def print_diff(diff, *, file=None, indent_level=0):
                     print_indent("+ " + str(v[1]), indent_level=indent_level+1)
 
 def yaml_diff(p1, p2,  *, set_keys=None):
+    yaml=ruamel.yaml.YAML(typ='rt')
     with open(p1) as f1:
-        d1 = yaml.load(f1,Loader=yaml.RoundTripLoader)
+        d1 = yaml.load(f1)
     with open(p2) as f2:
-        d2 = yaml.load(f2, Loader=yaml.RoundTripLoader)
+        d2 = yaml.load(f2)
 
     try:
         d1 = reprocess_dict(d1, set_keys)
